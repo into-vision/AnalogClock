@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="utf-8">
+	<meta name="author" content="バイザン @into_vision">
+	<title>Creator's Analog Clock</title>
+	<link rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+	<style type="text/css">
+		.contents {
+			display: grid;
+			width: 1024px;
+			grid-template-columns: 512px 512px;
+			grid-template-rows: 512px;
+			visibility: hidden;
+		}
+
+		.clock-container {
+			grid-row: 1;
+			grid-column: 1;
+			position: relative;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+		}
+
+		.clock-canvas {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			transform-style: preserve-3d;
+			transform-origin: 50% 50% 0;
+			perspective-origin: center;
+			user-select: none;
+		}
+
+		.dial {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			top: 0%;
+			left: 0%;
+		}
+
+		.hand {
+			position: absolute;
+			top: 50%;
+			left: calc((100% - 25%) * 0.5);
+			width: 25%;
+			height: 100%;
+			overflow: hidden;
+		}
+
+		.hourHand {
+			position: absolute;
+			top: 0%;
+			left: 0%;
+			height: 100%;
+			width: auto;
+		}
+
+		.minuteHand {
+			position: absolute;
+			top: 0%;
+			left: -100%;
+			height: 100%;
+			width: auto;
+		}
+
+		.secondHand {
+			position: absolute;
+			top: 0%;
+			left: -200%;
+			height: 100%;
+			width: auto;
+		}
+
+		.control-container {
+			grid-row: 1;
+			grid-column: 2;
+			width: 100%;
+			height: 100%;
+			display: flex;
+			flex-flow: column;
+		}
+
+		.controls {
+			margin: auto;
+			padding: 20px;
+			border: dashed 3px cornflowerblue;
+			background-color: #fbfbff;
+			border-radius: 10px;
+		}
+
+		.group {
+			display: flex;
+			flex-flow: row;
+			padding: 3px;
+		}
+
+		.font_rotate {
+			transform: rotateZ(90deg) rotateX(180deg);
+		}
+
+		.title {
+			margin-bottom: 20px;
+			font-weight: 600;
+		}
+
+		.name {
+			width: 70px;
+			margin-top: auto;
+			margin-bottom: auto;
+		}
+
+		.icon {
+			width: 40px;
+			padding-right: 10px;
+			margin-top: auto;
+			margin-bottom: auto;
+		}
+
+		input[type="range"] {
+			width: 200px;
+			margin-top: auto;
+			margin-bottom: auto;
+		}
+
+		input[type="button"] {
+			width: 50px;
+			height: 23px;
+			margin-top: auto;
+			margin-bottom: auto;
+			margin-left: 10px;
+			border: 1px solid #000;
+			border-radius: 10px;
+			cursor: pointer;
+		}
+
+		input[type="button"]:active {
+			transform: translate(1px, 2px);
+		}
+
+		.radioSelector {
+			display: flex;
+			flex-flow: column;
+		}
+	</style>
+	<script type="text/javascript">
+		const RatchType = {
+			PerSec: 0,
+			Intermittent: 1,
+			Smooth: 2,
+			Hide: 3,
+		}
+
+		// LocalStorageに常に値を記録しておくためのクラス
+		function ClockSettings() {
+			// パスから一個上のディレクトリを取得します。
+			// 理由としてはフォルダごとに設定を分けるために必要です。
+			const getDirectoryName = (path) => {
+				const end = path.lastIndexOf('/');
+				if (end < 0) {
+					return "";
+				}
+				const start = path.lastIndexOf('/', end - 1);
+				if (start < 0) {
+					return "";
+				}
+				return path.substring(start + 1, end);
+			}
+			this.prefix = getDirectoryName(location.pathname);
+
+			const getValue = (name, defaultValue) => {
+				this["Default/" + name] = defaultValue;
+				const result = localStorage.getItem(this.prefix + name);
+				return (result === null) ? defaultValue : parseFloat(result);
+			}
+			const setValue = (name, value) => {
+				localStorage.setItem(this.prefix + name, value.toString());
+				return value;
+			}
+
+			this._FOV = getValue("FOV", 20);
+			this._RotateX = getValue("RotateX", 0);
+			this._RotateY = getValue("RotateY", 0);
+			this._RotateZ = getValue("RotateZ", 0);
+			this._Scale = getValue("Scale", 100);
+			this._Depth = getValue("Depth", 2);
+			this._RatchType = getValue("RatchType", RatchType.PerSec);
+
+			Object.defineProperties(this, {
+				FOV: {
+					get: () => this._FOV,
+					set: value => this._FOV = setValue("FOV", value)
+				},
+				RotateX: {
+					get: () => this._RotateX,
+					set: value => this._RotateX = setValue("RotateX", value)
+				},
+				RotateY: {
+					get: () => this._RotateY,
+					set: value => this._RotateY = setValue("RotateY", value)
+				},
+				RotateZ: {
+					get: () => this._RotateZ,
+					set: value => this._RotateZ = setValue("RotateZ", value)
+				},
+				Scale: {
+					get: () => this._Scale,
+					set: value => this._Scale = setValue("Scale", value)
+				},
+				Depth: {
+					get: () => this._Depth,
+					set: value => this._Depth = setValue("Depth", value)
+				},
+				RatchType: {
+					get: () => this._RatchType,
+					set: value => this._RatchType = setValue("RatchType", value)
+				}
+			});
+		}
+
+		// 針の角度を動かすためのコアクラス
+		function Clock(settings) {
+			const applyHandRotateCSS = (style, deg, zOffset) => {
+				style.transformOrigin = "50% 0%";
+				style.transform = `rotate(${deg}deg) translate3D(0px, -50%, ${zOffset}px)`;
+			}
+			const degToRad = (deg) => {
+				return (deg / 180.0) * Math.PI;
+			}
+			const correctSec = (sec, millisec, ratchType) => {
+				sec += millisec / 1000.0;
+				if (ratchType === RatchType.PerSec) {
+					return Math.floor(sec);
+				} else if (ratchType === RatchType.Intermittent) {
+					return Math.floor(sec * 10.0) / 10.0;
+				}
+				return sec;
+			}
+
+			const updateStyle = (container, settings) => {
+				const style = container.style;
+				const size = container.clientWidth;
+				// perspectiveキーワードは、origin位置の2DPlaneのピクセルサイズが常に一定になるようなFOVを内部で構築している。
+				// そのためスタイル指定時にFOVから指定する場合はその一定になる距離を算出する。
+				const distance = size / Math.tan(degToRad(settings.FOV));
+				style.transform = `perspective(${distance}px) rotateY(${settings.RotateY}deg) rotateX(${-settings.RotateX}deg) rotateZ(${settings.RotateZ}deg) scale(${settings.Scale}%)`;
+			}
+
+			const canvas = document.getElementsByClassName("clock-canvas")[0];
+			const hourHand = document.getElementsByClassName("clock-hour-hand")[0];
+			const minuteHand = document.getElementsByClassName("clock-minute-hand")[0];
+			const secondHand = document.getElementsByClassName("clock-second-hand")[0];
+
+			const tick = () => {
+				const date = new Date();
+				const totalMilliSec = date.getMilliseconds();
+				const totalSecond = correctSec(date.getSeconds(), totalMilliSec, settings.RatchType);
+				const totalMinutes = date.getMinutes() + totalSecond / 60.0;
+				const totalHour = date.getHours() + totalMinutes / 60.0;
+				const depthBias = settings.Depth;
+				if (hourHand) {
+					const deg = (totalHour / 12.0) * 360.0;
+					applyHandRotateCSS(hourHand.style, deg, 1 * depthBias);
+				}
+				if (minuteHand) {
+					const deg = (totalMinutes / 60.0) * 360.0;
+					applyHandRotateCSS(minuteHand.style, deg, 2 * depthBias);
+				}
+				if (secondHand) {
+					const deg = (totalSecond / 60.0) * 360.0;
+					applyHandRotateCSS(secondHand.style, deg, 3 * depthBias);
+					secondHand.hidden = settings.RatchType === RatchType.Hide;
+				}
+				if (canvas) {
+					updateStyle(canvas, settings);
+				}
+			}
+			tick();
+
+			const interval_ms = 1000 / 60;	// 60FPS
+			const interval_id = setInterval(tick, interval_ms);
+		}
+
+		// Slider用の値同期クラス
+		function InputSlider(settings, name) {
+			const defaultValue = settings["Default/" + name];
+			const element = document.getElementById(name);
+			const inputs = element.getElementsByTagName("input");
+
+			const slider = inputs[0];
+			slider.value = settings[name].toString();
+			slider.oninput = () => {
+				settings[name] = parseFloat(slider.value);
+			};
+			const reset = inputs[1];
+			reset.onclick = () => {
+				slider.value = defaultValue.toString();
+				settings[name] = defaultValue;
+			};
+		}
+
+		// Radioボタン用の値同期クラス
+		function InputRadio(settings, name) {
+			const element = document.getElementById(name);
+			const inputs = element.getElementsByTagName("input");
+			for (let i = 0; i < inputs.length; i++) {
+				const r = inputs[i];
+				r.checked = settings.RatchType === i;
+				r.onclick = () => settings.RatchType = i;
+			}
+		}
+
+		window.onload = () => {
+			const settings = new ClockSettings();
+			new Clock(settings);
+			new InputSlider(settings, "RotateX");
+			new InputSlider(settings, "RotateY");
+			new InputSlider(settings, "RotateZ");
+			new InputSlider(settings, "FOV");
+			new InputSlider(settings, "Scale");
+			new InputSlider(settings, "Depth");
+			new InputRadio(settings, "Ratch");
+
+			// セットアップが完全に終わったら表示
+			const contents = document.getElementsByClassName("contents")[0];
+			contents.style.visibility = "visible";
+		};
+	</script>
+</head>
+
+<body>
+	<div class="contents">
+		<!-- 時計本体 -->
+		<div class="clock-container">
+			<div class="clock-canvas">
+				<img src="dial.png" class="dial" alt="" />
+				<div class="hand clock-hour-hand">
+					<img src="hand.png" class="hourHand" alt="" />
+				</div>
+				<div class="hand clock-minute-hand">
+					<img src="hand.png" class="minuteHand" alt="" />
+				</div>
+				<div class="hand clock-second-hand">
+					<img src="hand.png" class="secondHand" alt="" />
+				</div>
+			</div>
+		</div>
+		<!-- コントロールパネル -->
+		<div class="control-container">
+			<div class="controls">
+				<div class="group">
+					<label class="title">Creator's Analog Clock ver.1.0.0</label>
+				</div>
+				<div class="group" id="RotateX">
+					<div class="name">X軸回転</div>
+					<div class="icon"><span class="material-symbols-outlined font_rotate">360</span></div>
+					<input type="range" min="-90" max="90" step="1"></input>
+					<input type="button" value="Reset" onClick="reset('RotateX')"></input>
+				</div>
+				<div class="group" id="RotateY">
+					<div class="name">Y軸回転</div>
+					<div class="icon"><span class="material-symbols-outlined">360</span></div>
+					<input type="range" min="-90" max="90" step="1"></input>
+					<input type="button" value="Reset"></input>
+				</div>
+				<div class="group" id="RotateZ">
+					<div class="name">Z軸回転</div>
+					<div class="icon"><span class="material-symbols-outlined">rotate_right</span></div>
+					<input type="range" min="-90" max="90" step="1"></input>
+					<input type="button" value="Reset"></input>
+				</div>
+				<div class="group" id="Scale">
+					<div class="name">サイズ</div>
+					<div class="icon"><span class="material-symbols-outlined">photo_size_select_small</span>
+					</div>
+					<input type="range" min="60" max="120" step="1"></input>
+					<input type="button" value="Reset"></input>
+				</div>
+				<div class="group" id="FOV">
+					<div class="name">画角</div>
+					<div class="icon"><span class="material-symbols-outlined">vrpano</span></div>
+					<input type="range" min="10" max="70" step="1"></input>
+					<input type="button" value="Reset"></input>
+				</div>
+				<div class="group" id="Depth">
+					<div class="name">針の高さ</div>
+					<div class="icon"><span class="material-symbols-outlined">filter_list</span></div>
+					<input type="range" min="0.1" max="5" step="0.1"></input>
+					<input type="button" value="Reset"></input>
+				</div>
+				<div class="group" id="Ratch">
+					<div class="name">針の動き</div>
+					<div class="icon"><span class="material-symbols-outlined">history_toggle_off</span></div>
+					<div class="radioSelector">
+						<label><input type="radio" name="ratch" value="1" />
+							１秒おき
+						</label>
+						<label><input type="radio" name="ratch" value="2" />
+							ジリジリ
+						</label>
+						<label><input type="radio" name="ratch" value="3" />
+							スムーズ
+						</label>
+						<label><input type="radio" name="ratch" value="4" />
+							秒針なし
+						</label>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+
+</html>

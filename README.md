@@ -2,6 +2,9 @@
 
 https://user-images.githubusercontent.com/67828511/184906888-cf0eaa7c-5e67-4d69-b9fc-3b16e8aae22d.mp4
 
+## ◇ ダウンロード
+- [CreatorsAnalogClock.zip](https://github.com/into-vision/AnalogClock/raw/main/archive/analog_clock1_0_0.zip)
+
 ## ◇ 目指したもの
 
 - OBS上に簡単に設置可能  
@@ -30,7 +33,7 @@ https://user-images.githubusercontent.com/67828511/184906888-cf0eaa7c-5e67-4d69-
 https://user-images.githubusercontent.com/67828511/184910012-e9bc9ce2-6501-4f25-84ab-28aca5e32b34.mp4
 
 1. 以下のファイルをダウンロード
-   - CreatorsAnalogClock.zip
+   - [CreatorsAnalogClock.zip](https://github.com/into-vision/AnalogClock/raw/main/archive/analog_clock1_0_0.zip)
 2. お使いの配信素材フォルダに解凍
 3. OBSの下らへんにあるソース/+(追加)/ブラウザを選択
 4. 「ローカルファイル」をチェック
@@ -83,4 +86,4 @@ Alpha値が0の部分のRGBを書き換えることで抑制できます。
 
 ## ◇ クレジット
 
-- 製作者：バイザン(@into_vision)
+- 製作者：バイザン🐈(@into_vision)
